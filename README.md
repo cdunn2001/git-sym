@@ -15,9 +15,19 @@ ln -sf `pwd`/git_sym.py ~/bin/git-sym
 ```
 
 ## Using
-* Instead of a large file, create a symlink to `.git_sym/<filename>`.
-* Add a rule to `git_sym.makefile` which can retrieve `my_filename`.
+* Instead of a large file, create a symlink to `.git_sym/unique_filename`.
+```
+ln -sf .git_sym/unique_filename my_filename
+```
+* Add a rule to `git_sym.makefile` which can retrieve `unique_filename`.
+```
+unique_filename:
+	wget http://mysite.com/unique_filename
+```
 * Then, `git-sym update` will automatically retrieve the file and fill in the symbolic links.
+```
+git-sym update
+```
 
 An example will clarify this. (For more detailed examples see
 <https://github.com/cdunn2001/git-sym-test>.)
