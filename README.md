@@ -22,6 +22,7 @@ python git_sym.py -h
 ## Basic usage
 ### For repo users
 ```
+git-sym show
 git-sym update
 ```
 ### For repo owners
