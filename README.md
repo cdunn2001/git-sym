@@ -17,7 +17,10 @@ ln -sf `pwd`/git_sym.py ~/bin/git-sym
 ## Using
 * Instead of a large file, create a symlink to `.git_sym/<filename>`.
 * Add a rule to `git_sym.makefile` which can retrieve `my_filename`.
-* Then, `git-sym update` will automatiica
+* Then, `git-sym update` will automatically retrieve the file and fill in the symbolic links.
+
+An example will clarify this. (For more detailed examples see
+<https://github.com/cdunn2001/git-sym-test>.)
 
 ## Running
 You can test it right here. The `links` directory has some examples.
