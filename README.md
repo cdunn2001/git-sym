@@ -9,22 +9,46 @@ The purpose is to separate big-file caching from revision-control. There are sev
 But all those impose the penalty of checksums on the large files. We assert that the large files can be uniquely derived from URLs, versioned in S3 or by filename, etc. We store only symlinks in the git repo.
 
 ## Installing
+Just call it `git-sym` and put it in your PATH. Here is one way:
 ```
 ln -sf `pwd`/git_sym.py ~/bin/git-sym
 ```
 
+## Using
+* Instead of a large file, create a symlink to `.git_sym/<filename>`.
+* Add a rule to `git_sym.makefile` which can retrieve `my_filename`.
+* Then, `git-sym update` will automatiica
+
 ## Running
-You can test it right here.
+You can test it right here. The `links` directory has some examples.
 ```
-touch ~/foo
+$ ls -l links/foo
+lrwxr-xr-x  1 cdunn2001  staff  15 Jun 10 09:44 links/foo -> ../.git_sym/foo
+```
+For this example, a file called `foo` needs to exist in your home directory,
+because that is where our makefile looks for it:
+```
+$ cat git_sym.makefile
+foo:
+	cp -f ~/foo $@
+
+$ touch ~/foo
+```
+Then, just run `git-sym update`:
+```
 git-sym update links/foo
 # or
 # python git_sym.py update links/foo
 cat links/foo
 ```
-And this should fail:
+## Breaking the link
+To break it, remove the file from the cache and from its
+origin.
 ```
-rm -f ~/git_sym_cache/foo ~/foo
+rm -f ~/git_sym_cache/foo ~/foo .git_sym
+```
+Then, this should fail:
+```
 git-sym update
 ```
 
