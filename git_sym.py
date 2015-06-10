@@ -280,7 +280,7 @@ def unique_name(path):
     sha1 = sha1.strip()
     return 'sha1.' + sha1 + '.' + os.path.basename(path)
 
-def git_sym_update(symlinks):
+def git_sym_update(symlinks, **args):
     if not symlinks:
         symlinks = list(find_symlinks(GIT_SYM_LINK))
     needed = set()
@@ -295,7 +295,7 @@ def git_sym_update(symlinks):
     with cd(GIT_SYM_DIR):
         retrieve(needed)
     git_sym_check(symlinks)
-def git_sym_add(paths):
+def git_sym_add(paths, **args):
     needed = set()
     for path in paths:
         uname = unique_name(path)
@@ -312,17 +312,17 @@ def git_sym_add(paths):
     with cd(GIT_SYM_DIR):
         retrieve(needed)
     git_sym_show(paths)
-def git_sym_show(symlinks):
+def git_sym_show(symlinks, **args):
     if not symlinks:
         symlinks = find_all_symlinks()
     show_symlinks(symlinks, via=GIT_SYM_LINK)
-def git_sym_check(symlinks):
+def git_sym_check(symlinks, **args):
     if not symlinks:
         symlinks = list(find_symlinks(GIT_SYM_LINK))
     for symlink in symlinks:
         if not check_link(symlink):
             raise Exception(symlink)
-def git_sym_missing(symlinks):
+def git_sym_missing(symlinks, **arsg):
     if not symlinks:
         symlinks = list(find_symlinks(GIT_SYM_LINK))
     missing = 0
@@ -332,7 +332,7 @@ def git_sym_missing(symlinks):
             missing += 1
     #if missing:
     #    raise Exception(missing)
-def git_sym_fix(symlinks):
+def git_sym_fix(symlinks, **args):
     GIT_SYM_VIA_OLD = GIT_SYM_DIR
     if not symlinks:
         symlinks = list(find_symlinks(GIT_SYM_VIA_OLD))
@@ -356,7 +356,7 @@ def main(args):
     cmd = args['command']
     del args['command']
     try:
-        cmd_table[cmd](args['symlinks'])
+        cmd_table[cmd](**args)
     except subprocess.CalledProcessError as e:
         log(e)
         log(" in directory %r" %os.getcwd())
@@ -387,19 +387,39 @@ def parse_args():
             help='Symlink to GIT_SYM_DIR. Intermediate level of indirection. Should be ignored by git. [default=%(default)s]')
     parser.add_argument('--verbose', '-v', action='store_true')
     parser.add_argument('--debug', '-g', action='store_true')
+
     subs = parser.add_subparsers(dest='command')
-    parser_show = add_command(subs, 'show',
-            'Show symlinks on stdout. "O" indicates that git-sym will ignore it; "+" that it needs to be resolved; and "." or "/" that it is a fully resolved file or directory.')
-    parser_update = add_command(subs, 'update',
-            'Fill-in symlinks and retrieve files into cache.')
-    parser_check = add_command(subs, 'check',
-            'Look for the first unresolved symlink, if any. Return 1 if found. (Intended for scripting. Humans should use "missing".')
-    parser_missing = add_command(subs, 'missing',
-            'Print all unresolved symlinks on stdout.')
-    parser_fix = add_command(subs, 'fix',
-            '(IGNORE THIS FOR NOW.) If you add or remove GIT_SYM_LINK from ".gitignore", you will need to alter all symlinks. This does it automatically, but it does not commit the changes. (TODO: Support other changes.)')
-    parser_add = add_command(subs, 'add',
-            'Move named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. "git add". You still need to "git commit" before running "git-sym update".')
+
+    parser_show = subs.add_parser('show',
+            help='Show symlinks on stdout. "O" indicates that git-sym will ignore it; "+" that it needs to be resolved; and "." or "/" that it is a fully resolved file or directory.')
+    parser_show.add_argument('symlinks', nargs='*',
+            help='If not given, walk through tree to find relevant symlinks.')
+
+    parser_update = subs.add_parser('update',
+            help='Fill-in symlinks and retrieve files into cache.')
+    parser_update.add_argument('symlinks', nargs='*',
+            help='If not given, walk through tree to find relevant symlinks.')
+
+    parser_check = subs.add_parser('check',
+            help='Look for the first unresolved symlink, if any. Return 1 if found. (Intended for scripting. Humans should use "missing".')
+    parser_check.add_argument('symlinks', nargs='*',
+            help='If not given, walk through tree to find relevant symlinks.')
+
+    parser_missing = subs.add_parser('missing',
+            help='Print all unresolved symlinks on stdout.')
+    parser_missing.add_argument('symlinks', nargs='*',
+            help='If not given, walk through tree to find relevant symlinks.')
+
+    parser_fix = subs.add_parser('fix',
+            help='(IGNORE THIS FOR NOW.) If you add or remove GIT_SYM_LINK from ".gitignore", you will need to alter all symlinks. This does it automatically, but it does not commit the changes. (TODO: Support other changes.)')
+    parser_fix.add_argument('symlinks', nargs='*',
+            help='If not given, walk through tree to find relevant symlinks.')
+
+    parser_add = subs.add_parser('add',
+            help='Move named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. "git add". You still need to "git commit" before running "git-sym update".')
+    parser_add.add_argument('paths', nargs='+',
+            help='Files and/or directories. At least one path must be supplied.')
+
     return parser.parse_args()
 
 
