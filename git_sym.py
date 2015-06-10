@@ -333,6 +333,13 @@ def git_sym_missing(symlinks, **arsg):
             missing += 1
     #if missing:
     #    raise Exception(missing)
+def git_sym_clean(symlinks, **args):
+    if not symlinks:
+        symlinks = find_all_symlinks()
+    log('clean links from %r' %symlinks)
+    basenames = [os.path.basename(os.readlink(symlink)) for symlink in symlinks]
+    with cd(GIT_SYM_DIR):
+        shell('rm -f %s' %' '.join(basenames))
 def git_sym_fix(symlinks, old_link, **args):
     GIT_SYM_VIA_OLD = os.path.abspath(old_link)
     log('via=%r' %GIT_SYM_VIA_OLD)
@@ -354,6 +361,7 @@ def main(args):
     cmd_table = {
             'add': git_sym_add,
             'check': git_sym_check,
+            'clean': git_sym_clean,
             'fix': git_sym_fix,
             'missing': git_sym_missing,
             'show': git_sym_show,
@@ -423,6 +431,11 @@ def parse_args():
     parser_fix.add_argument('--old-link',
             default=os.path.join(GIT_ROOT_DIR, '.git', 'git_sym'),
             help='[default=%(default)s]')
+
+    parser_clean = subs.add_parser('clean',
+            help='Remove named or discovered links from DIR. (To remove them all, use rm.) Subsequent `git-sym update` will re-create those links and also re-run make, which *might* update cached files.')
+    parser_clean.add_argument('symlinks', nargs='*',
+            help='If not given, walk through tree to find relevant symlinks.')
 
     parser_add = subs.add_parser('add',
             help='Move named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. "git add". You still need to "git commit" before running "git-sym update".')
