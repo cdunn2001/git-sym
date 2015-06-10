@@ -9,28 +9,20 @@ The purpose is to separate big-file caching from revision-control. There are sev
 But all those impose the penalty of checksums on the large files. We assert that the large files can be uniquely derived from URLs, versioned in S3 or by filename, etc. We store only symlinks in the git repo.
 
 ## Installing
-Just call it `git-sym` and put it in your PATH. Here is one way:
+You can run this as a **git** command by calling it `git-sym`
+in your `$PATH`. Here is one way:
 ```
 ln -sf `pwd`/git_sym.py ~/bin/git-sym
 ```
-
-## Using
-* Instead of a large file, create a symlink to `.git_sym/unique_filename`.
+Alternatively, you can run it directly:
 ```
-ln -sf .git_sym/unique_filename my_filename
-```
-* Add a rule to `git_sym.makefile` which can retrieve `unique_filename`.
-```
-unique_filename:
-	wget http://mysite.com/unique_filename
-```
-* Then, `git-sym update` will automatically retrieve the file and fill in the symbolic links.
-```
-git-sym update
+python git_sym.py -h
 ```
 
-An example will clarify this. (For more detailed examples see
-<https://github.com/cdunn2001/git-sym-test>.)
+## Examples
+These examples explain the basics:
+
+* <https://github.com/cdunn2001/git-sym-test/wiki/Examples>
 
 ## Running
 You can test it right here. The `links` directory has some examples.
@@ -54,6 +46,22 @@ git-sym update links/foo
 # python git_sym.py update links/foo
 cat links/foo
 ```
+
+## How it works
+* Instead of a large file, create a symlink to `.git_sym/unique_filename`.
+```
+ln -sf .git_sym/unique_filename my_filename
+```
+* Add a rule to `git_sym.makefile` which can retrieve `unique_filename`.
+```
+unique_filename:
+	wget http://mysite.com/unique_filename
+```
+* Then, `git-sym update` will automatically retrieve the file and fill in the symbolic links.
+```
+git-sym update
+```
+
 ## Breaking the link
 To break it, remove the file from the cache and from its
 origin.
@@ -121,6 +129,14 @@ git config --global alias.gsexec '!exec '
 We use that to learn the actual location of the `.git/` directory. If it fails, we try current directory, and if `.git` is not a directory there, we attempt to find it in `../.git/modules/REPO`, where REPO is the root directory. (This can fail in many ways. The alias never fails.)
 
 Again, we expect you to forget that, so we add that alias to your local repo for you. Believe us: It's a Good Thing.
+
+### git-sym-test
+This module provides a way to test **git-sym**. It is not required.
+However, it is listed as a git-submodule here for conveniently
+testing submodule support.
+```
+git submodule update --init
+```
 
 ### .gitignore
 Since the intermediate symlink is also in the repo, but points to a changing target, it needs to be listed in `.gitignore`. (That anticipates both accidental `git add` and `git clean`.) We expect you to forget that important rule, so **git-sym** will detect its absence and add it to `.git/info/exclude` instead. No worries.

@@ -1,0 +1,3 @@
+[submodule "git-sym-test"]
+	path = git-sym-test
+	url = https://github.com/cdunn2001/git-sym-test
