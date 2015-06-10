@@ -415,7 +415,7 @@ def parse_args():
             help='If not given, walk through tree to find relevant symlinks.')
 
     parser_check = subs.add_parser('check',
-            help='Look for the first unresolved symlink, if any. Return 1 if found. (Intended for scripting. Humans should use "missing".')
+            help='Look for the first unresolved symlink, if any. Return 1 unless all symlinks are resolved. (Intended for scripting. Humans should use "missing".')
     parser_check.add_argument('symlinks', nargs='*',
             help='If not given, walk through tree to find relevant symlinks.')
 
