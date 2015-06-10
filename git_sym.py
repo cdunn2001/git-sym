@@ -312,6 +312,7 @@ def git_sym_add(paths, **args):
     with cd(GIT_SYM_DIR):
         retrieve(needed)
     git_sym_show(paths)
+    shell('git add %s' %' '.join(paths))
 def git_sym_show(symlinks, **args):
     if not symlinks:
         symlinks = find_all_symlinks()
@@ -332,10 +333,12 @@ def git_sym_missing(symlinks, **arsg):
             missing += 1
     #if missing:
     #    raise Exception(missing)
-def git_sym_fix(symlinks, **args):
-    GIT_SYM_VIA_OLD = GIT_SYM_DIR
+def git_sym_fix(symlinks, old_link, **args):
+    GIT_SYM_VIA_OLD = os.path.abspath(old_link)
+    log('via=%r' %GIT_SYM_VIA_OLD)
     if not symlinks:
         symlinks = list(find_symlinks(GIT_SYM_VIA_OLD))
+    log(symlinks)
     for sl in symlinks:
         fix(sl, GIT_SYM_VIA_OLD, GIT_SYM_LINK)
 def main(args):
@@ -345,6 +348,9 @@ def main(args):
     if args['debug']:
         log = debug = debug_msg
     debug(args)
+    global GIT_SYM_LINK
+    GIT_SYM_LINK = os.path.abspath(args['link'])
+    log('GIT_SYM_LINK=%r' %GIT_SYM_LINK)
     cmd_table = {
             'add': git_sym_add,
             'check': git_sym_check,
@@ -411,9 +417,12 @@ def parse_args():
             help='If not given, walk through tree to find relevant symlinks.')
 
     parser_fix = subs.add_parser('fix',
-            help='(IGNORE THIS FOR NOW.) If you add or remove GIT_SYM_LINK from ".gitignore", you will need to alter all symlinks. This does it automatically, but it does not commit the changes. (TODO: Support other changes.)')
+            help='Change symlinks from OLD_LINK to LINK. `git add` the changes, but do not commit. (This is helpful if you change the LINK.)')
     parser_fix.add_argument('symlinks', nargs='*',
-            help='If not given, walk through tree to find relevant symlinks.')
+            help='If not given, walk through tree to find relevant symlinks, but with respect to OLD_LINK, not LINK.')
+    parser_fix.add_argument('--old-link',
+            default=os.path.join(GIT_ROOT_DIR, '.git', 'git_sym'),
+            help='[default=%(default)s]')
 
     parser_add = subs.add_parser('add',
             help='Move named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. "git add". You still need to "git commit" before running "git-sym update".')
