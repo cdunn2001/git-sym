@@ -95,7 +95,7 @@ def get_GIT_SYM_LINK():
 def get_GIT_SYM_CACHE_DIR():
     result = os.environ.get('GIT_SYM_CACHE_DIR', None)
     if not result:
-        result = shell('echo ${HOME}/git_sym_cache').strip()
+        result = shell('echo ${HOME}/git-sym-cache').strip()
     result = os.path.abspath(result)
     if not os.path.isdir(result):
         make_dirs(result)
