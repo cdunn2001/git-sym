@@ -88,7 +88,7 @@ def get_GIT_SYM_LINK():
     # Re-create, in case of 'git clean -x'.
     redo_GIT_SYM_LINK(GIT_SYM_LINK)
     if not is_in_gitignore(os.path.relpath(GIT_SYM_LINK, start=os.getcwd())):
-        cmd = "echo '/.git-sym' >| %s/info/exclude" %(
+        cmd = "echo '/.git-sym' >> %s/info/exclude" %(
                 GIT_DIR)
         shell(cmd)
     return GIT_SYM_LINK
@@ -136,7 +136,7 @@ def global_setup():
     GIT_SYM_CACHE_DIR = get_GIT_SYM_CACHE_DIR()
     GIT_ROOT_DIR = get_GIT_ROOT_DIR()
     GIT_DIR = os.path.abspath(get_GIT_DIR())
-    GIT_SYM_DIR = os.path.join(GIT_DIR, 'git_sym')
+    GIT_SYM_DIR = os.path.join(GIT_DIR, 'git-sym-dir')
     debug("GIT_SYM_DIR=%r" %GIT_SYM_DIR)
     debug("GIT_SYM_CACHE_DIR=%r" %GIT_SYM_CACHE_DIR)
     debug("GIT_DIR=%r" %GIT_DIR)
@@ -438,7 +438,7 @@ def parse_args():
     parser_fix.add_argument('symlinks', nargs='*',
             help='If not given, walk through tree to find relevant symlinks, but with respect to OLD_LINK, not LINK.')
     parser_fix.add_argument('--old-link',
-            default=os.path.join(GIT_ROOT_DIR, '.git', 'git_sym'),
+            default=os.path.join(GIT_ROOT_DIR, '.git', 'git-sym-dir'),
             help='[default=%(default)s]')
 
     parser_clean = subs.add_parser('clean',
