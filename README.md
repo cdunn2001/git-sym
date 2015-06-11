@@ -1,22 +1,34 @@
 # Why?
-The purpose is to separate big-file caching from revision-control. There are several alternatives:
+The purpose is to separate big-file caching from revision-control.
 
+From the author of **git-fat**:
+> Checking large binary files into a source repository (Git or otherwise) is a bad idea because repository size quickly becomes unreasonable. Even if the instantaneous working tree stays manageable, preserving repository integrity requires all binary files in the entire project history, which given the typically poor compression of binary diffs, implies that the repository size will become impractically large. Some people recommend checking binaries into different repositories or even not versioning them at all, but these are not satisfying solutions for most workflows.
+
+## How is **git-sym** different?
+There are several alternatives:
   * https://github.com/jedbrown/git-fat
   * https://github.com/schacon/git-media
   * http://git-annex.branchable.com/
   * https://github.com/github/git-lfs
 
-But all those impose the penalty of checksums on the large files. We assert that the large files can be uniquely derived from URLs, versioned in S3 or by filename, etc. We store only symlinks in the git repo.
+But all those impose the penalty of checksums on the large files. We assert that check-summing is not absolutely requried to guarantee integrity. These large resources can be uniquely derived from stable URLs (e.g. versioned in Amazon S3 or stored by unique filename somewhere). **git-sym** stores only symlinks in the git repo, not the checksums themselves.
+
+In addition to some faster git operations, **git-sym** also allows symlinking *directories*. We think that is a more apt more for a wide variety of use-cases.
+
+## How are these large files retrieved and cached?
+**git-sym** leaves that up to you. The repo author is responsible for providing a **makefile** with a rule for every unique target.
+
+Some of the tools listed above provide a lot of out-of-the-box caching functionality, but we prefer to decouple caching from revision-control.
 
 ## Installing
 You can run this as a **git** command by calling it `git-sym`
 in your `$PATH`. Here is one way:
 ```
-ln -sf `pwd`/git_sym.py ~/bin/git-sym
+ln -sf `pwd`/git-sym ~/bin/git-sym
 ```
 Alternatively, you can run it directly:
 ```
-python git_sym.py -h
+python git-sym -h
 ```
 
 ## Basic usage
