@@ -36,6 +36,14 @@ def shell(cmd):
     """
     log("!%s" %cmd)
     return subprocess.check_output(cmd, shell=True) #TODO: Allow python2.6?
+def system(cmd):
+    """Run cmd as a system-call.
+    Raise Exception on any error.
+    """
+    log(cmd)
+    rc = os.system(cmd)
+    if rc:
+        raise Exception('%d <- %r' %(rc, cmd))
 def make_dirs(d):
     log("makedirs(%s)" %d)
     if not os.path.exists(d):
@@ -219,7 +227,7 @@ def retrieve_using_make(makefilename, paths):
         cmd = "make -j -f %s %s" %(
             makefilename,
             ' '.join("'%s'"%p for p in a_few))
-        shell(cmd)
+        system(cmd)
 def retrieve(paths):
     debug("retrieve: %r" %paths)
     if not paths:
