@@ -5,7 +5,7 @@ Environment variables used:
     GIT_SYM_CACHE_DIR
 
 We use 2 levels of symlink. The first are committed in the git repo. The second are in GIT_SYM_DIR.
-If GIT_SYM_DIR is not set, we try to use .git/git_sym for the symlink cache. But a submodule lacks
+If GIT_SYM_DIR is not set, we try to use .git/git-sym for the symlink cache. But a submodule lacks
 the
 
 We expect this in .gitconfig:
@@ -84,11 +84,12 @@ def get_GIT_SYM_LINK():
     Create symlink and add to git-ignores, if needed.
     Needs GIT_DIR and GIT_ROOT_DIR.
     """
-    GIT_SYM_LINK = os.path.join(GIT_ROOT_DIR, '.git_sym')
+    GIT_SYM_LINK = os.path.join(GIT_ROOT_DIR, '.git-sym')
     # Re-create, in case of 'git clean -x'.
     redo_GIT_SYM_LINK(GIT_SYM_LINK)
     if not is_in_gitignore(os.path.relpath(GIT_SYM_LINK, start=os.getcwd())):
-        cmd = "echo '/.git_sym' >| %s/info/exclude" %GIT_DIR
+        cmd = "echo '/.git-sym' >| %s/info/exclude" %(
+                GIT_DIR)
         shell(cmd)
     return GIT_SYM_LINK
 def get_GIT_SYM_CACHE_DIR():
@@ -117,7 +118,7 @@ def read_cfg(root):
     cfg = {
         'symlinks': {},
     }
-    filename = os.path.join(GIT_ROOT_DIR, '.git_sym.cfg')
+    filename = os.path.join(GIT_ROOT_DIR, '.git-sym.cfg')
     if os.path.exists(filename):
         parser = ConfigParser.ConfigParser()
         log("filename=%r" %filename)
@@ -143,7 +144,7 @@ def global_setup():
     make_dirs(GIT_SYM_DIR)
     make_dirs(GIT_SYM_CACHE_DIR)
 
-    # Use an extra level an indirection if '/.git_sym' is in '.gitignore'.
+    # Use an extra level an indirection if '/.git-sym' is in '.gitignore'.
     GIT_SYM_LINK = get_GIT_SYM_LINK() # could be None
     #GIT_SYM_INI = read_cfg(GIT_ROOT_DIR)
     debug("GIT_SYM_LINK=%r" %GIT_SYM_LINK)
@@ -232,7 +233,7 @@ def retrieve(paths):
     debug("retrieve: %r" %paths)
     if not paths:
         return # to avoid the default make rule
-    makefilename = os.path.join(GIT_ROOT_DIR, 'git_sym.makefile')
+    makefilename = os.path.join(GIT_ROOT_DIR, 'git-sym.makefile')
     with cd(GIT_SYM_CACHE_DIR):
         retrieve_using_make(makefilename, paths)
     for path in paths:
@@ -397,7 +398,7 @@ def parse_args():
             description='Cache symlinks (presumably for large files).',
             epilog=epilog)
     parser.add_argument('--retriever',
-            help="(not implemented) For now, we always use 'make -f git_sym.makefile'.")
+            help="(not implemented) For now, we always use 'make -f git-sym.makefile'.")
     parser.add_argument('--cache-dir',
             default=GIT_SYM_CACHE_DIR,
             help='Directory in which to store retrieved files/directories. [default=%(default)s]')
