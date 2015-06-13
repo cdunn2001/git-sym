@@ -1,7 +1,6 @@
 #!/usr/bin/env python2.7
 """
 Environment variables used:
-    GIT_SYM_DIR
     GIT_SYM_CACHE_DIR
 
 We use 3 levels of symlink.
@@ -10,6 +9,9 @@ We use 3 levels of symlink.
 3. That points to GIT_DIR/git-sym/links
 4. Those point to GIT_SYM_CACHE_DIR
 
+If cache-dir changes, old links are *not* updated unless broken.
+
+## Changes in .git/config
 We expect this in .gitconfig:
 
     [alias]
@@ -19,6 +21,7 @@ That facilitates running this script, and is also used within this script.
 (Git aliases are always run in the root of a Git tree.)
   http://stackoverflow.com/questions/957928/is-there-a-way-to-get-the-git-root-directory-in-one-command
 
+If missing, we add that to .git/config instead.
 """
 from contextlib import contextmanager
 import sys, os, re, subprocess, argparse, traceback, ConfigParser
@@ -102,7 +105,7 @@ def get_GIT_SYM_LINK():
 def get_GIT_SYM_CACHE_DIR():
     result = os.environ.get('GIT_SYM_CACHE_DIR', None)
     if not result:
-        result = shell('echo ${HOME}/git-sym-cache').strip()
+        result = os.path.join(GIT_SYM_DIR, 'cache')
     result = os.path.abspath(result)
     if not os.path.isdir(result):
         make_dirs(result)
@@ -140,10 +143,10 @@ def global_setup():
     """
     global GIT_SYM_LINK, GIT_SYM_DIR, GIT_SYM_CACHE_DIR, GIT_DIR, GIT_ROOT_DIR
     shell("git config alias.gsexec '!exec '")
-    GIT_SYM_CACHE_DIR = get_GIT_SYM_CACHE_DIR()
-    GIT_ROOT_DIR = get_GIT_ROOT_DIR()
     GIT_DIR = os.path.abspath(get_GIT_DIR())
-    GIT_SYM_DIR = os.path.join(GIT_DIR, 'git-sym')
+    GIT_SYM_DIR = os.path.join(GIT_DIR, 'git-sym-local')
+    GIT_SYM_CACHE_DIR = get_GIT_SYM_CACHE_DIR() # might depend on GIT_SYM_DIR
+    GIT_ROOT_DIR = get_GIT_ROOT_DIR()
     debug("GIT_SYM_DIR=%r" %GIT_SYM_DIR)
     debug("GIT_SYM_CACHE_DIR=%r" %GIT_SYM_CACHE_DIR)
     debug("GIT_DIR=%r" %GIT_DIR)
@@ -243,15 +246,22 @@ def retrieve(paths):
     makefilename = os.path.join(GIT_ROOT_DIR, 'git-sym.makefile')
     with cd(GIT_SYM_CACHE_DIR):
         retrieve_using_make(makefilename, paths)
+    if (os.path.commonprefix([GIT_SYM_CACHE_DIR, GIT_SYM_DIR]) ==
+            GIT_SYM_DIR):
+        cache_dir = os.path.relpath(GIT_SYM_CACHE_DIR)
+    else:
+        cache_dir = GIT_SYM_CACHE_DIR
     for path in paths:
-        cached_path = os.path.join(GIT_SYM_CACHE_DIR, path)
+        cached_path = os.path.join(cache_dir, path)
         debug('Checking %r -> %r' %(path, cached_path))
         assert os.path.exists(cached_path), cached_path
-        if not os.path.islink(path):
+        if not os.path.exists(path):
+            if os.path.lexists(path):
+                os.remove(path)
             log("$ ln -sf %r %r" %(cached_path, path))
             os.symlink(cached_path, path)
+        # TODO: Remove these extra checks, unless debug mode?
         assert os.path.exists(path), path
-        assert os.path.exists(cached_path), cached_path
         assert os.path.samefile(cached_path, path), "%r != %r" %(
                 cached_path, path)
 def get_linked_path(symlink, via):
@@ -311,6 +321,7 @@ def git_sym_update(symlinks, **args):
     with cd(os.path.join(GIT_SYM_DIR, 'links')):
         retrieve(needed)
     git_sym_check(symlinks)
+    # TODO Print on failure, unless silent mode.
 def git_sym_add(paths, force=False, **args):
     needed = set()
     for path in paths:
