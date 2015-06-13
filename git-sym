@@ -80,11 +80,12 @@ def redo_GIT_SYM_LINK(GIT_SYM_LINK):
     """GIT_SYM_LINK should *not* be under revision-control.
     However, even if in .gitignore, 'git clean' can remove it.
     So sometimes we need to re-create it.
-    To keep it simple (in case of a change) we *always* re-create it.
+    We re-create it if broken.
     """
-    link_to = os.path.join(GIT_SYM_DIR, 'links')
+    link_to = os.path.relpath(os.path.join(GIT_SYM_DIR, 'links'))
     if (os.path.lexists(GIT_SYM_LINK) and
             os.readlink(GIT_SYM_LINK) != link_to):
+        #debug('%r != %r'%(os.readlink(GIT_SYM_LINK), link_to))
         os.remove(GIT_SYM_LINK)
     if not os.path.lexists(GIT_SYM_LINK):
         log("$ ln -sf %r %r" %(link_to, GIT_SYM_LINK))
