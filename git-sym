@@ -352,7 +352,7 @@ def git_sym_link(paths, add=False, diff=False, **args):
             log('%r already exists, but matches. Removing %r.')
             rmtree(path)
         else:
-            shell('mv %s %s %s' %(path, cached))
+            shell('mv %s %s' %(path, cached))
         link_to = os.path.relpath(os.path.join(GIT_SYM_LINK, uname), start=os.path.dirname(path))
         log('os.symlink(%r, %r)' %(link_to, path))
         os.symlink(link_to, path)
