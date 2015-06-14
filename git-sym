@@ -458,10 +458,10 @@ def parse_args():
             help="(not implemented yet) For now, we always use 'make -f git-sym.makefile'.")
     parser.add_argument('--cache-dir',
             default=default_GIT_SYM_CACHE_DIR,
-            help='Directory in which to store retrieved files/directories. [default=%(default)s]')
+            help='Directory in which to store retrieved files/directories. [default=%(default)r]')
     parser.add_argument('--link',
             default=default_GIT_SYM_LINK,
-            help='Symlink to GIT_SYM_DIR/links. (Intermediate level of indirection.) This path should be ignored by git. [default=%(default)s]')
+            help='Symlink to GIT_SYM_DIR/links. (Intermediate level of indirection.) This path should be ignored by git. [default=%(default)r]')
     parser.add_argument('--silent', '-s', action='store_true',
             help='Otherwise, log to stderr.')
     parser.add_argument('--debug', '-g', action='store_true')
@@ -492,11 +492,11 @@ def parse_args():
             help='Move (mv) named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. Move one at-a-time in case of a failure.')
     parser_link.add_argument('--mv',
             default='mv -n',
-            help='Command to run. [default=%(default)s]')
+            help='Command to run. [default=%(default)r]')
     parser_link.add_argument('--add', action='store_true',
             help='Also run "git add". You still need to run "git commit".')
-    parser_link.add_argument('--diff',
-            help='(TODO) If destination exists, diff.')
+    parser_link.add_argument('--diff', action='store_true',
+            help='If destination exists, diff before removing path.')
     parser_link.add_argument('paths', nargs='+',
             help='Files and/or directories. At least one path must be supplied.')
 
@@ -510,7 +510,7 @@ def parse_args():
             help='Also run "git add". You still need to run "git commit".')
     parser_unlink.add_argument('--cp',
             default='cp -a',
-            help='Command to run. (On Windows, use cygwin.) A good idea: "rsync -av" [default=%(default)s]')
+            help='Command to run. (On Windows, use cygwin.) A good idea: "rsync -av" [default=%(default)r]')
     parser_unlink.add_argument('symlinks', nargs='+',
             help='Files and/or directories. At least one path must be supplied.')
 
@@ -520,7 +520,7 @@ def parse_args():
             help='If not given, walk through tree to find relevant symlinks, but with respect to OLD_LINK, not LINK.')
     parser_fix.add_argument('--old-link',
             default=os.path.join(GIT_ROOT_DIR, 'git-sym'),
-            help='[default=%(default)s]')
+            help='[default=%(default)r]')
 
     parser_clean = subs.add_parser('clean',
             help='(Rarely needed.) Remove named or discovered links from GIT_SYM_DIR/links. (To remove them all, use rm.) Subsequent `git-sym update` will re-create those links and also re-run make, which *might* update cached files.')
