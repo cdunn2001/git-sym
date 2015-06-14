@@ -40,18 +40,32 @@ That facilitates running this script, and is also used within this script.
 If missing, we add that to .git/config instead.
 """
 from contextlib import contextmanager
-import sys, os, re, subprocess, argparse, traceback, ConfigParser
+import sys, os, re, subprocess, argparse, traceback, ConfigParser, shutil
+
+
+def log_msg(msg):
+    sys.stderr.write(str(msg))
+    sys.stderr.write('\n')
+def debug_msg(msg):
+    sys.stderr.write('#')
+    sys.stderr.write(str(msg))
+    sys.stderr.write('\n')
+def noop(msg):
+    pass
+
+debug = noop
+log = log_msg
 
 
 @contextmanager
-def cd(newdir):
+def cd(newdir, log=log):
     prevdir = os.getcwd()
     os.chdir(os.path.expanduser(newdir))
     log('-> in dir %r' %newdir)
     yield
     os.chdir(prevdir)
     log('<- back to dir %r' %prevdir)
-def shell(cmd):
+def shell(cmd, log=log):
     """Return result of 'cmd' in a shell.
     cmd: a list of strings
     """
@@ -66,29 +80,23 @@ def system(cmd):
     if rc:
         raise Exception('%d <- %r' %(rc, cmd))
 def make_dirs(d):
-    log("makedirs(%s)" %d)
+    debug("makedirs(%s)" %d)
     if not os.path.exists(d):
         log("mkdir -p %s" %d)
         os.makedirs(d)
-def log_msg(msg):
-    sys.stderr.write('#')
-    sys.stderr.write(str(msg))
-    sys.stderr.write('\n')
-def debug_msg(msg):
-    sys.stderr.write(str(msg))
-    sys.stderr.write('\n')
-def noop(msg):
-    pass
-
-debug = noop
-log = noop
-
+def rmtree(p):
+    if os.path.isdir(p):
+        log('Removing directory %r')
+        shutil.rmtree(p)
+    elif os.path.isfile(p):
+        log('Removing file %r')
+        os.unlink(p)
 def is_in_gitignore(path):
     """Must be relative to CWD, *not* absolute.
     """
     cmd = "git check-ignore -q %r" %path
     try:
-        shell(cmd)
+        shell(cmd, log=debug)
         return True
     except Exception:
         return False
@@ -104,42 +112,41 @@ def redo_GIT_SYM_LINK(GIT_SYM_LINK):
         #debug('%r != %r'%(os.readlink(GIT_SYM_LINK), link_to))
         os.remove(GIT_SYM_LINK)
     if not os.path.lexists(GIT_SYM_LINK):
-        log("$ ln -sf %r %r" %(link_to, GIT_SYM_LINK))
+        log("os.symlink(%r, %r)" %(link_to, GIT_SYM_LINK))
         os.symlink(link_to, GIT_SYM_LINK)
-def get_GIT_SYM_LINK():
+def set_GIT_SYM_LINK(val):
     """
     Create symlink and add to git-ignores, if needed.
     Needs GIT_DIR and GIT_ROOT_DIR.
     """
-    GIT_SYM_LINK = os.path.join(GIT_ROOT_DIR, '.git-sym')
+    global GIT_SYM_LINK
+    GIT_SYM_LINK = val
     # Re-create, in case of 'git clean -x'.
     redo_GIT_SYM_LINK(GIT_SYM_LINK)
     if not is_in_gitignore(os.path.relpath(GIT_SYM_LINK, start=os.getcwd())):
         cmd = "echo '/.git-sym' >> %s/info/exclude" %(
                 GIT_DIR)
-        shell(cmd)
+        shell(cmd, log=debug)
     return GIT_SYM_LINK
-def get_GIT_SYM_CACHE_DIR():
-    result = os.environ.get('GIT_SYM_CACHE_DIR', None)
-    if not result:
-        result = os.path.join(GIT_SYM_DIR, 'cache')
-    result = os.path.abspath(result)
-    if not os.path.isdir(result):
-        make_dirs(result)
-    return result
+def set_GIT_SYM_CACHE_DIR(val):
+    global GIT_SYM_CACHE_DIR
+    GIT_SYM_CACHE_DIR = os.path.abspath(val)
+    if not os.path.isdir(GIT_SYM_CACHE_DIR):
+        make_dirs(GIT_SYM_CACHE_DIR)
 def get_GIT_DIR():
     """Can return None.
     """
     try:
         # '.git' could be a file for git-submodule, so rely on rev-parse.
-        result = shell('git rev-parse --git-dir').strip()
+        result = shell('git rev-parse --git-dir', log=debug).strip()
     except Exception as e:
         log(e)
         # Assume we are running in the '.git' dir already, as a git-hook.
         result = None
     return result
 def get_GIT_ROOT_DIR():
-    result = shell('git gsexec pwd -P').strip()
+    shell("git config alias.gsexec '!exec '", log=debug)
+    result = shell('git gsexec pwd -P', log=debug).strip()
     return result
 def read_cfg(root):
     cfg = {
@@ -158,23 +165,15 @@ def global_setup():
     """We need to know the top-level directory, unless
     we already have some environment variables.
     """
-    global GIT_SYM_LINK, GIT_SYM_DIR, GIT_SYM_CACHE_DIR, GIT_DIR, GIT_ROOT_DIR
-    shell("git config alias.gsexec '!exec '")
+    global GIT_DIR, GIT_ROOT_DIR, GIT_SYM_DIR
     GIT_DIR = os.path.abspath(get_GIT_DIR())
     GIT_SYM_DIR = os.path.join(GIT_DIR, 'git-sym-local')
-    GIT_SYM_CACHE_DIR = get_GIT_SYM_CACHE_DIR() # might depend on GIT_SYM_DIR
     GIT_ROOT_DIR = get_GIT_ROOT_DIR()
-    debug("GIT_SYM_DIR=%r" %GIT_SYM_DIR)
-    debug("GIT_SYM_CACHE_DIR=%r" %GIT_SYM_CACHE_DIR)
-    debug("GIT_DIR=%r" %GIT_DIR)
     debug("GIT_ROOT_DIR=%r" %GIT_ROOT_DIR)
-    make_dirs(os.path.join(GIT_SYM_DIR, 'links'))
-    make_dirs(GIT_SYM_CACHE_DIR)
-
-    # Use an extra level an indirection if '/.git-sym' is in '.gitignore'.
-    GIT_SYM_LINK = get_GIT_SYM_LINK() # could be None
+    debug("GIT_DIR=%r" %GIT_DIR)
+    debug("GIT_SYM_DIR=%r" %GIT_SYM_DIR)
     #GIT_SYM_INI = read_cfg(GIT_ROOT_DIR)
-    debug("GIT_SYM_LINK=%r" %GIT_SYM_LINK)
+    make_dirs(os.path.join(GIT_SYM_DIR, 'links'))
 def is_link_thru(via, symlink):
     """
     Reject symlink if it does not point to a relative path.
@@ -194,7 +193,7 @@ def find_all_symlinks():
     # By using git-ls-tree intead of os.walk(), we do not recurse into submodules.
     # However, we are really looking only at the commit, not the index nor working-dir.
     cmd = 'git ls-tree -r --full-name HEAD'
-    ls_tree = shell(cmd)
+    ls_tree = shell(cmd, log=debug)
     re_ls_tree = re.compile(r'^120000\s+blob\s+\S+\s+(\S+)$', flags=re.MULTILINE)
     for full_name in re_ls_tree.findall(ls_tree):
         # full_name is from root-dir, not CWD.
@@ -252,7 +251,9 @@ def retrieve_using_make(makefilename, paths):
         if len(a_few) > 1:
             # Put one back to avoid exceeding our limit.
             paths.append(a_few.pop())
-        cmd = "make -j -f %s %s" %(
+        silence = '--silent' if log==noop else ''
+        cmd = "make -j %s -f %s %s" %(
+            silence,
             makefilename,
             ' '.join("'%s'"%p for p in a_few))
         system(cmd)
@@ -261,7 +262,7 @@ def retrieve(paths):
     if not paths:
         return # to avoid the default make rule
     makefilename = os.path.join(GIT_ROOT_DIR, 'git-sym.makefile')
-    with cd(GIT_SYM_CACHE_DIR):
+    with cd(GIT_SYM_CACHE_DIR, log=log):
         retrieve_using_make(makefilename, paths)
     if (os.path.commonprefix([GIT_SYM_CACHE_DIR, GIT_SYM_DIR]) ==
             GIT_SYM_DIR):
@@ -275,7 +276,7 @@ def retrieve(paths):
         if not os.path.exists(path):
             if os.path.lexists(path):
                 os.remove(path)
-            log("$ ln -sf %r %r" %(cached_path, path))
+            log("os.symlink(%r, %r)" %(cached_path, path))
             os.symlink(cached_path, path)
         # TODO: Remove these extra checks, unless debug mode?
         assert os.path.exists(path), path
@@ -319,7 +320,7 @@ def unique_name(path):
     if not os.path.isfile(path):
         raise Exception('We cannot cache that which does not exist.' %path)
     sha1 = shell('git hash-object %r' %path)
-    log('strip? %r' %sha1)
+    debug('%r' %sha1)
     sha1 = sha1.strip()
     return 'sha1.' + sha1 + '.' + os.path.basename(path)
 
@@ -335,28 +336,47 @@ def git_sym_update(symlinks, **args):
             assert path == basename, (path, basename)
             needed.add(basename)
     debug("needed: %s" %repr(needed))
-    with cd(os.path.join(GIT_SYM_DIR, 'links')):
+    with cd(os.path.join(GIT_SYM_DIR, 'links'), log=log):
         retrieve(needed)
     git_sym_check(symlinks)
     # TODO Print on failure, unless silent mode.
-def git_sym_add(paths, force=False, **args):
+def git_sym_link(paths, add=False, diff=False, **args):
     needed = set()
     for path in paths:
         uname = unique_name(path)
         needed.add(uname)
         cached = os.path.join(GIT_SYM_CACHE_DIR, uname)
-        forced = '-f' if force else ''
-        shell('mv %s %s %s' %(forced, path, cached))
+        if os.path.exists(cached):
+            if diff:
+                shell('diff -ru %r %r' %(path, cached))
+            log('%r already exists, but matches. Removing %r.')
+            rmtree(path)
+        else:
+            shell('mv %s %s %s' %(path, cached))
         link_to = os.path.relpath(os.path.join(GIT_SYM_LINK, uname), start=os.path.dirname(path))
-        log('$ ln -sf %r %r' %(link_to, path))
+        log('os.symlink(%r, %r)' %(link_to, path))
         os.symlink(link_to, path)
-        shell('git add %s' %path)
-        mode = os.stat(cached).st_mode & ~0222
-        log('$ chmod -w %r' %cached)
-        os.chmod(cached, mode)
+        if add:
+            shell('git add %s' %path, log=log)
+            mode = os.stat(cached).st_mode & ~0222
+            log('os.chmod(%r, %0o)' %(cached, mode))
+            os.chmod(cached, mode)
+    # TODO: Test these next 2 lines.
     git_sym_update(paths)
     git_sym_show(paths)
-    shell('git add %s' %' '.join(paths))
+def git_sym_unlink(symlinks, cp, add=False, **args):
+    if any(symlink.endswith('/') for symlink in symlinks):
+        raise Exception('For "unlink", paths must not end in "/".')
+    for symlink in symlinks:
+        cached = os.path.realpath(symlink)
+        if not os.path.exists(cached):
+            raise Exception('%r -> %r does not exist!' %(
+                symlink, cached))
+        os.unlink(symlink)
+        shell('%s %s %s' %(cp, cached, symlink), log=log)
+        if add:
+            shell('git add %s' %symlink, log=log)
+        # TODO: maybe check sha1
 def git_sym_show(symlinks, **args):
     if not symlinks:
         symlinks = find_all_symlinks()
@@ -380,10 +400,10 @@ def git_sym_missing(symlinks, **arsg):
 def git_sym_clean(symlinks, **args):
     if not symlinks:
         symlinks = find_all_symlinks()
-    log('clean links from %r' %symlinks)
+    debug('clean links from %r' %symlinks)
     basenames = [os.path.basename(os.readlink(symlink)) for symlink in symlinks]
-    with cd(os.path.join(GIT_SYM_DIR, 'links')):
-        shell('rm -f %s' %' '.join(basenames))
+    with cd(os.path.join(GIT_SYM_DIR, 'links'), log=log):
+        shell('rm -f %s' %' '.join(basenames), log=log)
 def git_sym_fix(symlinks, old_link, **args):
     GIT_SYM_VIA_OLD = os.path.abspath(old_link)
     log('via=%r' %GIT_SYM_VIA_OLD)
@@ -394,21 +414,24 @@ def git_sym_fix(symlinks, old_link, **args):
         fix(sl, GIT_SYM_VIA_OLD, GIT_SYM_LINK)
 def main(args):
     global log, debug
-    if args['verbose']:
-        log = log_msg
+    if args['silent']:
+        log = noop
     if args['debug']:
-        log = debug = debug_msg
+        debug = debug_msg
     debug(args)
-    global GIT_SYM_LINK
-    GIT_SYM_LINK = os.path.abspath(args['link'])
-    log('GIT_SYM_LINK=%r' %GIT_SYM_LINK)
+    set_GIT_SYM_LINK(os.path.abspath(args['link']))
+    set_GIT_SYM_CACHE_DIR(os.path.abspath(args['cache_dir']))
+    debug('GIT_SYM_LINK=%r' %GIT_SYM_LINK)
+    debug("GIT_SYM_CACHE_DIR=%r" %GIT_SYM_CACHE_DIR)
     cmd_table = {
-            'add': git_sym_add,
+            'add': git_sym_link, # deprecated
             'check': git_sym_check,
             'clean': git_sym_clean,
             'fix': git_sym_fix,
+            'link': git_sym_link,
             'missing': git_sym_missing,
             'show': git_sym_show,
+            'unlink': git_sym_unlink,
             'update': git_sym_update,
     }
     cmd = args['command']
@@ -422,28 +445,25 @@ def main(args):
     except Exception:
         log(traceback.format_exc())
         sys.exit(1)
-def add_command(subs, command, help):
-    sub = subs.add_parser(command, help=help)
-    sub.add_argument('symlinks', nargs='*', help='If not given, walk through tree to find relevant symlinks.')
-    return sub
 def parse_args():
-    global_setup()
+    default_GIT_SYM_LINK = os.path.join(GIT_ROOT_DIR, '.git-sym')
+    default_GIT_SYM_CACHE_DIR = os.environ.get('GIT_SYM_CACHE_DIR', None)
+    if not default_GIT_SYM_CACHE_DIR:
+        default_GIT_SYM_CACHE_DIR = os.path.join(GIT_SYM_DIR, 'cache')
     epilog = 'See git-sym in GitHub for details.'
     parser = argparse.ArgumentParser(
             description='Cache symlinks (presumably for large files).',
             epilog=epilog)
     parser.add_argument('--retriever',
-            help="(not implemented) For now, we always use 'make -f git-sym.makefile'.")
+            help="(not implemented yet) For now, we always use 'make -f git-sym.makefile'.")
     parser.add_argument('--cache-dir',
-            default=GIT_SYM_CACHE_DIR,
+            default=default_GIT_SYM_CACHE_DIR,
             help='Directory in which to store retrieved files/directories. [default=%(default)s]')
-    parser.add_argument('--dir',
-            default=GIT_SYM_DIR,
-            help='Parent of directory of symlinks into CACHE_DIR. (Final level of indirection.) [default=%(default)s]')
     parser.add_argument('--link',
-            default=GIT_SYM_LINK,
-            help='Symlink to GIT_SYM_DIR. (Intermediate level of indirection.) Should be ignored by git. [default=%(default)s]')
-    parser.add_argument('--verbose', '-v', action='store_true')
+            default=default_GIT_SYM_LINK,
+            help='Symlink to GIT_SYM_DIR/links. (Intermediate level of indirection.) This path should be ignored by git. [default=%(default)s]')
+    parser.add_argument('--silent', '-s', action='store_true',
+            help='Otherwise, log to stderr.')
     parser.add_argument('--debug', '-g', action='store_true')
 
     subs = parser.add_subparsers(dest='command')
@@ -468,27 +488,49 @@ def parse_args():
     parser_missing.add_argument('symlinks', nargs='*',
             help='If not given, walk through tree to find relevant symlinks.')
 
+    parser_link = subs.add_parser('link',
+            help='Move (mv) named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. Move one at-a-time in case of a failure.')
+    parser_link.add_argument('--mv',
+            default='mv -n',
+            help='Command to run. [default=%(default)s]')
+    parser_link.add_argument('--add', action='store_true',
+            help='Also run "git add". You still need to run "git commit".')
+    parser_link.add_argument('--diff',
+            help='(TODO) If destination exists, diff.')
+    parser_link.add_argument('paths', nargs='+',
+            help='Files and/or directories. At least one path must be supplied.')
+
+    parser_add = subs.add_parser('add',
+            help='(Deprecated.) Alias for "link".')
+    parser_add.add_argument('paths', nargs='+')
+
+    parser_unlink = subs.add_parser('unlink',
+            help='Copy files/directories resolved from the given "symlinks", typically residing in GIT_SYM_CACHE_DIR. Remove symlinks before over-writing.')
+    parser_unlink.add_argument('--add', action='store_true',
+            help='Also run "git add". You still need to run "git commit".')
+    parser_unlink.add_argument('--cp',
+            default='cp -a',
+            help='Command to run. (On Windows, use cygwin.) A good idea: "rsync -av" [default=%(default)s]')
+    parser_unlink.add_argument('symlinks', nargs='+',
+            help='Files and/or directories. At least one path must be supplied.')
+
     parser_fix = subs.add_parser('fix',
-            help='Change symlinks from OLD_LINK to LINK. `git add` the changes, but do not commit. (This is helpful if you change the LINK.)')
+            help='(Rarely needed.) Change symlinks from OLD_LINK to LINK. `git add` the changes, but do not commit. (This is helpful if you change the LINK.)')
     parser_fix.add_argument('symlinks', nargs='*',
             help='If not given, walk through tree to find relevant symlinks, but with respect to OLD_LINK, not LINK.')
     parser_fix.add_argument('--old-link',
-            default=os.path.join(GIT_ROOT_DIR, '.git', 'git-sym'),
+            default=os.path.join(GIT_ROOT_DIR, 'git-sym'),
             help='[default=%(default)s]')
 
     parser_clean = subs.add_parser('clean',
-            help='Remove named or discovered links from DIR. (To remove them all, use rm.) Subsequent `git-sym update` will re-create those links and also re-run make, which *might* update cached files.')
+            help='(Rarely needed.) Remove named or discovered links from GIT_SYM_DIR/links. (To remove them all, use rm.) Subsequent `git-sym update` will re-create those links and also re-run make, which *might* update cached files.')
     parser_clean.add_argument('symlinks', nargs='*',
             help='If not given, walk through tree to find relevant symlinks.')
-
-    parser_add = subs.add_parser('add',
-            help='Move named files/directories to GIT_SYM_CACHE_DIR. Create git-sym symlinks in their places. "git add". You still need to "git commit" before running "git-sym update".')
-    parser_add.add_argument('paths', nargs='+',
-            help='Files and/or directories. At least one path must be supplied.')
 
     return parser.parse_args()
 
 
 if __name__=='__main__':
+    global_setup()
     args = parse_args()
     main(vars(args))
