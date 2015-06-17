@@ -106,7 +106,8 @@ def redo_GIT_SYM_LINK(GIT_SYM_LINK):
     So sometimes we need to re-create it.
     We re-create it if broken.
     """
-    link_to = os.path.relpath(os.path.join(GIT_SYM_DIR, 'links'))
+    link_to = os.path.relpath(os.path.join(GIT_SYM_DIR, 'links'),
+            start=GIT_ROOT_DIR)
     if (os.path.lexists(GIT_SYM_LINK) and
             os.readlink(GIT_SYM_LINK) != link_to):
         #debug('%r != %r'%(os.readlink(GIT_SYM_LINK), link_to))
