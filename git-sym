@@ -200,16 +200,33 @@ def find_all_symlinks():
         # full_name is from root-dir, not CWD.
         abs_name = os.path.join(GIT_ROOT_DIR, full_name)
         yield abs_name
-def find_symlinks(via):
-    """Find symlinks which point thru 'via'.
+def normal_filter(abspath):
+    return is_link_thru(GIT_SYM_LINK, abspath)
+def find_symlinks_if(filter, paths):
+    if not paths:
+        paths = ['.']
+    result = []
+    for path in paths:
+        if not os.path.islink(path) and os.path.isdir(path):
+            found = list(filter_symlinks(filter, path))
+            debug('dir: %r %r' %(path, found))
+            result.extend(found)
+        else:
+            # Assume caller wants this.
+            result.append(path)
+            debug('keep: %r' %path)
+    return result
+def filter_symlinks(filter, within='.'):
+    """Keep symlinks which satisfy 'filter'.
     Ignore absolute symlinks.
     Return both file and dir symlinks.
     """
-    debug("find_symlinks(via=%r)" %via)
-    assert os.path.isabs(via)
+    debug("filter_symlinks(within=%r)" %within)
     cwd = os.getcwd()
-    for abs_name in find_all_symlinks():
-        if is_link_thru(via, abs_name):
+    with cd(within):
+        all_abs = list(find_all_symlinks())
+    for abs_name in all_abs:
+        if filter(abs_name):
             symlink = os.path.relpath(abs_name, start=cwd)
             log('symlink: %r' %symlink)
             yield symlink
@@ -326,8 +343,7 @@ def unique_name(path):
     return 'sha1.' + sha1 + '.' + os.path.basename(path)
 
 def git_sym_update(symlinks, **args):
-    if not symlinks:
-        symlinks = list(find_symlinks(GIT_SYM_LINK))
+    symlinks = list(find_symlinks_if(normal_filter, symlinks))
     needed = set()
     for symlink in symlinks:
         if not check_link(symlink):
@@ -379,18 +395,16 @@ def git_sym_unlink(symlinks, cp, add=False, **args):
             shell('git add %s' %symlink, log=log)
         # TODO: maybe check sha1
 def git_sym_show(symlinks, **args):
-    if not symlinks:
-        symlinks = find_all_symlinks()
+    filter = lambda abspath: True
+    symlinks = find_symlinks_if(filter, symlinks)
     show_symlinks(symlinks, via=GIT_SYM_LINK)
 def git_sym_check(symlinks, **args):
-    if not symlinks:
-        symlinks = list(find_symlinks(GIT_SYM_LINK))
+    symlinks = list(find_symlinks_if(normal_filter, symlinks))
     for symlink in symlinks:
         if not check_link(symlink):
             raise Exception(symlink)
 def git_sym_missing(symlinks, **arsg):
-    if not symlinks:
-        symlinks = list(find_symlinks(GIT_SYM_LINK))
+    symlinks = list(find_symlinks_if(normal_filter, symlinks))
     missing = 0
     for symlink in symlinks:
         if not check_link(symlink):
@@ -399,8 +413,7 @@ def git_sym_missing(symlinks, **arsg):
     #if missing:
     #    raise Exception(missing)
 def git_sym_clean(symlinks, **args):
-    if not symlinks:
-        symlinks = find_all_symlinks()
+    symlinks = find_symlinks_if(normal_filter, symlinks)
     debug('clean links from %r' %symlinks)
     basenames = [os.path.basename(os.readlink(symlink)) for symlink in symlinks]
     with cd(os.path.join(GIT_SYM_DIR, 'links'), log=log):
@@ -408,8 +421,9 @@ def git_sym_clean(symlinks, **args):
 def git_sym_fix(symlinks, old_link, **args):
     GIT_SYM_VIA_OLD = os.path.abspath(old_link)
     log('via=%r' %GIT_SYM_VIA_OLD)
-    if not symlinks:
-        symlinks = list(find_symlinks(GIT_SYM_VIA_OLD))
+    def filter(abspath):
+        return is_link_thru(GIT_SYM_VIA_OLD, abspath)
+    symlinks = list(find_symlinks_if(filter, symlinks))
     log(symlinks)
     for sl in symlinks:
         fix(sl, GIT_SYM_VIA_OLD, GIT_SYM_LINK)
